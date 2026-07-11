@@ -1,38 +1,62 @@
 use axum::{
     Json, Router,
+    http::StatusCode,
+    response::Html,
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+mod db;
+use db::*;
 #[tokio::main]
+
 async fn main() {
-    // Build the router
+    // build the router
     let app = Router::new()
-        .route("/", get(root))
-        .route("/hello/:name", get(hello))
         .route("/newurl/:url", get(new_url))
-        .route("/json", post(handle_json));
-    // Specify the address to listen on
+        .route("/url/:id", get(fetch_url))
+        .route("/r/:id", get(redirect_page));
+    // the address to listen on
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("Server running at http://{}", addr);
-    // Start the server
+    // start the server
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
 }
-// Root handler
-async fn root() -> &'static str {
-    "Welcome to the Rust Web Server!"
-}
+
+// saves the url and gives back the short link
 async fn new_url(axum::extract::Path(url): axum::extract::Path<String>) -> String {
-    format!("Your url is {}", url)
+    let result = db::handler("", &url, "addurl").await;
+
+    // if let checks for Some and unwraps the id in one go
+    if let Some(id) = result {
+        format!("Saved {} at http://127.0.0.1:3000/url/{}", url, id)
+    } else {
+        "Failed to save url".to_string()
+    }
 }
-// Dynamic route handler
+// looks up the id and gives back the saved url or a 404 if its not there
+async fn fetch_url(axum::extract::Path(id): axum::extract::Path<String>) -> (StatusCode, String) {
+    let result = db::handler(&id, "", "pullinfo").await;
+
+    if let Some(url) = result {
+        (StatusCode::OK, url)
+    } else {
+        (StatusCode::NOT_FOUND, format!("No url found for id {}", id))
+    }
+}
+
+// serves the frontend page which gets baked into the binary at compile time
+async fn redirect_page() -> Html<&'static str> {
+    Html(include_str!("../../frontend/index.html"))
+}
+// says hello with the name from the path
 async fn hello(axum::extract::Path(name): axum::extract::Path<String>) -> String {
     format!("Hello, {}!", name)
 }
-// JSON handler
+// takes json in and sends json back
 #[derive(Deserialize)]
 struct InputData {
     name: String,
@@ -41,12 +65,4 @@ struct InputData {
 #[derive(Serialize)]
 struct ResponseData {
     message: String,
-}
-async fn handle_json(Json(payload): Json<InputData>) -> Json<ResponseData> {
-    Json(ResponseData {
-        message: format!(
-            "Hello, {}! You are {} years old.",
-            payload.name, payload.age
-        ),
-    })
 }
