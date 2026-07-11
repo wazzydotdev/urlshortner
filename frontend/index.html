@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <body>
+    <p>redirecting...</p>
+    <script>
+      const slug = window.location.pathname.split("/").pop(); // "/r/Rhh12" → "Rhh12"
+
+      fetch(`/url/${slug}`) // ask backend for the target
+        .then((r) => {
+          if (!r.ok) throw new Error("not found"); // backend sends 404 if the id doesnt exist
+          return r.text();
+        })
+        .then((url) =>
+          window.location.replace(
+            url.startsWith("http") ? url : `https://${url}`,
+          ),
+        )
+        .catch(() => {
+          document.body.textContent = `No url found for id ${slug}`;
+        });
+    </script>
+  </body>
+</html>
