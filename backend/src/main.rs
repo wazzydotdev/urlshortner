@@ -13,17 +13,15 @@ use db::*;
 async fn main() {
     // build the router
     let app = Router::new()
-        .route("/newurl/:url", get(new_url))
-        .route("/url/:id", get(fetch_url))
-        .route("/r/:id", get(redirect_page));
+        .route("/newurl/{url}", get(new_url))
+        .route("/url/{id}", get(fetch_url))
+        .route("/r/{id}", get(redirect_page));
     // the address to listen on
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("Server running at http://{}", addr);
     // start the server
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let bind = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(bind, app).await.unwrap();
 }
 
 // saves the url and gives back the short link
